@@ -1,7 +1,7 @@
 import { useSpring, animated } from '@react-spring/web'
 import { useInView } from 'react-intersection-observer'
 import classNames from 'classnames'
-import { YouTubeIcon, PlayIcon } from '@/components/Icons'
+import { YouTubeIcon, PlayIcon, ExternalLinkIcon } from '@/components/Icons'
 
 interface SubscribeButtonProps {
   channelId: string
