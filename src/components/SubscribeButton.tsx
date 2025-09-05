@@ -1,5 +1,4 @@
-import { useSpring, animated } from '@react-spring/web'
-import { useInView } from 'react-intersection-observer'
+import { motion } from 'framer-motion'
 import classNames from 'classnames'
 import { YouTubeIcon, PlayIcon, ExternalLinkIcon } from '@/components/Icons'
 
@@ -9,44 +8,13 @@ interface SubscribeButtonProps {
 }
 
 export const SubscribeButton = ({ channelId, className }: SubscribeButtonProps) => {
-  const [ref, inView] = useInView({
-    threshold: 0.1,
-    triggerOnce: true
-  })
-
-  const [springs, api] = useSpring(() => ({
-    scale: 1,
-    y: 0,
-    config: {
-      mass: 1,
-      tension: 400,
-      friction: 20
-    }
-  }))
-
-  const handleHover = () => {
-    api.start({
-      scale: 1.05,
-      y: -4
-    })
-  }
-
-  const handleHoverEnd = () => {
-    api.start({
-      scale: 1,
-      y: 0
-    })
-  }
 
   return (
-    <animated.a
-      ref={ref}
+    <motion.a
       href={`https://www.youtube.com/channel/${channelId}?sub_confirmation=1`}
       target="_blank"
       rel="noopener noreferrer"
-      style={springs}
-      onMouseEnter={handleHover}
-      onMouseLeave={handleHoverEnd}
+      whileHover={{ scale: 1.05, y: -4 }}
       className={classNames(
         'group flex items-center justify-center gap-3 px-8 py-4 text-xl font-bold',
         'bg-youtube-red hover:bg-red-700 text-white rounded-full shadow-xl',
