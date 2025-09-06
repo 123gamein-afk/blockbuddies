@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useWindowSize } from 'react-use'
 import Confetti from 'react-confetti'
@@ -10,6 +10,8 @@ import { SubscribeButton } from '@/components/SubscribeButton'
 import { NewSubAlert } from '@/components/NewSubAlert'
 import { ShortCard } from '@/components/ShortCard'
 import { FloatingElement } from '@/components/FloatingElement'
+import { MilestoneCelebration } from '@/components/MilestoneCelebration'
+import { AnimatedProgress } from '@/components/AnimatedProgress'
 import { 
   YouTubeIcon, 
   HeartIcon, 
@@ -69,6 +71,42 @@ export default function Home() {
   const [showConfetti, setShowConfetti] = useState(false)
   const [loading, setLoading] = useState(true)
   const [newSubNotification, setNewSubNotification] = useState(false)
+  const [animatedProgress, setAnimatedProgress] = useState(0)
+  const [milestoneReached, setMilestoneReached] = useState<number | null>(null)
+  const [showNewSubAlert, setShowNewSubAlert] = useState(false)
+  const { width, height } = useWindowSize()
+
+  // Milestones array
+  const milestones = [50, 100, 150, 200, 250, 300, 350, 400, 450, 500]
+
+  // Check if current subscriber count hits a milestone
+  const checkMilestone = useCallback((currentSubs: number, previousSubs: number) => {
+    const reachedMilestone = milestones.find(milestone => 
+      currentSubs >= milestone && previousSubs < milestone
+    )
+    
+    if (reachedMilestone) {
+      setMilestoneReached(reachedMilestone)
+      setShowConfetti(true)
+      setTimeout(() => {
+        setMilestoneReached(null)
+        setShowConfetti(false)
+      }, 8000)
+    }
+  }, [])
+
+  // Handle keyboard events
+  useEffect(() => {
+    const handleKeyPress = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() === 'b') {
+        setShowConfetti(true)
+        setTimeout(() => setShowConfetti(false), 5000)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyPress)
+    return () => window.removeEventListener('keydown', handleKeyPress)
+  }, [])
 
   const fetchStats = async () => {
     try {
@@ -82,13 +120,15 @@ export default function Home() {
         setDelta(data.delta || 0)
         setHistory(data.history || [])
         
-        // Check for new subscribers
+        // Check for new subscribers and milestones
         if (previousSubs > 0 && data.stats.subs > previousSubs) {
-          setShowConfetti(true)
+          checkMilestone(data.stats.subs, previousSubs)
           setNewSubNotification(true)
+          setShowNewSubAlert(true)
+          
           setTimeout(() => {
-            setShowConfetti(false)
             setNewSubNotification(false)
+            setShowNewSubAlert(false)
           }, 5000)
         }
       }
@@ -111,12 +151,51 @@ export default function Home() {
     }
   }
 
+  const simulateNewSub = () => {
+    if (!stats) return
+    const previousSubs = stats.subs
+    const newStats = { ...stats, subs: stats.subs + 1 }
+    setStats(newStats)
+    setDelta(1)
+    checkMilestone(newStats.subs, previousSubs)
+    setNewSubNotification(true)
+    setShowNewSubAlert(true)
+    
+    setTimeout(() => {
+      setNewSubNotification(false)
+      setShowNewSubAlert(false)
+    }, 5000)
+  }
+
   useEffect(() => {
     fetchStats()
     fetchShorts()
     const interval = setInterval(fetchStats, 10000) // Poll every 10 seconds
     return () => clearInterval(interval)
   }, [])
+
+  // Animate progress bar from 0 to current on mount
+  useEffect(() => {
+    if (stats && !loading) {
+      const targetProgress = Math.min(100, (stats.subs / goal) * 100)
+      let start = 0
+      const duration = 2000 // 2 seconds
+      const startTime = Date.now()
+      
+      const animate = () => {
+        const elapsed = Date.now() - startTime
+        const progress = Math.min(elapsed / duration, 1)
+        const easeOutQuart = 1 - Math.pow(1 - progress, 4)
+        setAnimatedProgress(start + (targetProgress - start) * easeOutQuart)
+        
+        if (progress < 1) {
+          requestAnimationFrame(animate)
+        }
+      }
+      
+      requestAnimationFrame(animate)
+    }
+  }, [stats, goal, loading])
 
   const progressPercentage = stats ? Math.min(100, (stats.subs / goal) * 100) : 0
   const subscribersToGo = Math.max(0, goal - (stats?.subs || 0))
@@ -126,237 +205,352 @@ export default function Home() {
     subscribers: point.subs
   }))
 
+  // Get next milestone
+  const nextMilestone = milestones.find(milestone => milestone > (stats?.subs || 0))
+  const progressToNextMilestone = nextMilestone ? 
+    Math.min(100, ((stats?.subs || 0) / nextMilestone) * 100) : 100
+
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-          className="w-16 h-16 border-4 border-white border-t-transparent rounded-full"
-        />
+      <div className="min-h-screen flex items-center justify-center bg-black">
+        <div className="text-center">
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+            className="w-16 h-16 border-4 border-white border-t-transparent rounded-full mx-auto mb-4"
+          />
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-white text-xl font-semibold"
+          >
+            Loading your amazing content...
+          </motion.div>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 text-white relative overflow-hidden">
-      {/* Animated Background Elements */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute w-96 h-96 -top-48 -left-48 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
-        <div className="absolute w-96 h-96 -bottom-48 -right-48 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
-        <div className="absolute w-96 h-96 top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-indigo-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-4000"></div>
-      </div>
-
-      {showConfetti && <Confetti numberOfPieces={200} recycle={false} />}
+    <>
+      <Head>
+        <title>{stats?.title || 'BlockBuddies'} - Subscriber Dashboard</title>
+        <meta name="description" content="Real-time subscriber dashboard with milestones and celebrations" />
+      </Head>
       
-      {/* New Subscriber Notification */}
-      <AnimatePresence>
-        {newSubNotification && (
-          <motion.div
-            initial={{ opacity: 0, y: -100 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -100 }}
-            className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 bg-green-500 text-white px-6 py-3 rounded-full shadow-lg"
-          >
-            🎉 New Subscriber! Welcome to the family! 🎉
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <div className="min-h-screen bg-black text-white overflow-hidden">
+        {/* Confetti */}
+        {showConfetti && <Confetti width={width} height={height} numberOfPieces={300} recycle={false} />}
+        
+        {/* Milestone Celebration */}
+        <MilestoneCelebration
+          milestone={milestoneReached || 0}
+          isVisible={!!milestoneReached}
+          onClose={() => {
+            setMilestoneReached(null)
+            setShowConfetti(false)
+          }}
+        />
 
-      <div className="container mx-auto px-4 py-12 relative z-10">
-        {/* Header Section */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-16"
-        >
-          <div className="flex items-center justify-center mb-6">
-            {stats?.thumbnail && (
-              <img
-                src={stats.thumbnail}
-                alt={stats.title}
-                className="w-24 h-24 rounded-full border-4 border-white shadow-lg mr-6"
-              />
-            )}
-            <div>
-              <h1 className="text-4xl md:text-6xl font-bold bg-gradient-to-r from-pink-400 to-purple-400 bg-clip-text text-transparent">
-                {stats?.title || 'Loading...'}
-              </h1>
-              <p className="text-xl text-gray-300 mt-2">
-                Join our amazing community! 🚀
-              </p>
-            </div>
-          </div>
+        {/* Legacy New Subscriber Notification */}
+        <AnimatePresence>
+          {newSubNotification && (
+            <motion.div
+              initial={{ opacity: 0, y: -100 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -100 }}
+              className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 bg-green-500 text-white px-6 py-3 rounded-full shadow-lg"
+            >
+              🎉 New Subscriber! Welcome to the family! 🎉
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-          {/* Subscribe Button */}
-          <motion.a
-            href={`https://www.youtube.com/channel/${process.env.NEXT_PUBLIC_CHANNEL_ID || 'UCnc_hj_ZGl4vu5GHLOTOf5g'}?sub_confirmation=1`}
-            target="_blank"
-            rel="noopener noreferrer"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="inline-flex items-center bg-red-600 hover:bg-red-700 text-white font-bold py-4 px-8 rounded-full text-xl shadow-lg transition-all duration-300 animate-pulse-slow"
-          >
-            <PlayIcon className="mr-3 w-6 h-6" />
-            Subscribe Now!
-            <ExternalLinkIcon className="ml-3 w-5 h-5" />
-          </motion.a>
-        </motion.div>
-
-        {/* Main Stats Section - Focused on Subscriber Progress */}
-        <div className="max-w-4xl mx-auto mb-12">
-          {/* Subscriber Counter & Progress */}
+        <div className="container mx-auto px-4 py-8">
+          {/* Header Section */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="glass rounded-3xl p-12 backdrop-blur-lg bg-white/10 shadow-2xl border border-white/20"
+            className="text-center mb-12"
           >
-  <h2 className="text-3xl font-bold mb-8 flex items-center justify-center">
-    <UsersIcon className="mr-4 w-10 h-10 text-purple-400" />
-    Subscriber Progress
-  </h2>
-            <div className="text-center mb-10">
-              <motion.div
-                key={stats?.subs}
-                initial={{ scale: 0.8 }}
-                animate={{ scale: 1 }}
-                className="text-7xl md:text-9xl font-bold bg-gradient-to-r from-purple-400 via-pink-400 to-blue-400 bg-clip-text text-transparent"
-              >
-                {stats?.subs.toLocaleString() || '0'}
-              </motion.div>
-              <p className="text-xl text-gray-300">Current Subscribers</p>
+            <div className="flex items-center justify-center mb-6">
+              {stats?.thumbnail && (
+                <motion.img
+                  initial={{ scale: 0, rotate: -180 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  transition={{ duration: 1, type: "spring" }}
+                  src={stats.thumbnail}
+                  alt={stats.title}
+                  className="w-24 h-24 rounded-full border-4 border-white shadow-2xl mr-6"
+                />
+              )}
+              <div>
+                <motion.h1
+                  initial={{ opacity: 0, x: -50 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.3 }}
+                  className="text-4xl md:text-6xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent"
+                >
+                  {stats?.title || 'Loading...'}
+                </motion.h1>
+                <motion.p
+                  initial={{ opacity: 0, x: -50 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.5 }}
+                  className="text-xl text-gray-300 mt-2"
+                >
+                  Join our amazing community! 🚀
+                </motion.p>
+              </div>
+            </div>
+
+            {/* Subscribe Button */}
+            <motion.a
+              href={`https://www.youtube.com/channel/${process.env.NEXT_PUBLIC_CHANNEL_ID || 'UCnc_hj_ZGl4vu5GHLOTOf5g'}?sub_confirmation=1`}
+              target="_blank"
+              rel="noopener noreferrer"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.7 }}
+              whileHover={{ scale: 1.05, boxShadow: "0 0 30px rgba(255,0,0,0.5)" }}
+              whileTap={{ scale: 0.95 }}
+              className="inline-flex items-center bg-red-600 hover:bg-red-700 text-white font-bold py-4 px-8 rounded-full text-xl shadow-2xl transition-all duration-300"
+            >
+              <PlayIcon className="mr-3 w-6 h-6" />
+              Subscribe Now!
+              <ExternalLinkIcon className="ml-3 w-5 h-5" />
+            </motion.a>
+            
+            {/* Instructions */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 1 }}
+              className="mt-4 text-sm text-gray-400 space-y-1"
+            >
+              <p>💡 Press 'B' for confetti celebration!</p>
+              <p>🎮 Click "Simulate New Subscriber" to test the system!</p>
+              <p>🎯 Watch for milestone celebrations at 50, 100, 150, 200, 250, 300, 350, 400, 450, 500 subs!</p>
+            </motion.div>
+          </motion.div>
+
+          {/* Main Stats Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+            {/* Subscriber Counter & Progress */}
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.2 }}
+              className="glass-dark rounded-3xl p-8 border-2 border-gray-800"
+            >
+              <h2 className="text-2xl font-bold mb-6 flex items-center text-white">
+                <UsersIcon className="mr-3 w-8 h-8 text-purple-400" />
+                Subscriber Progress
+              </h2>
+              
+              {/* Use AnimatedProgress component */}
+              <AnimatedProgress 
+                currentSubs={stats?.subs || 0}
+                goal={goal}
+                duration={2000}
+              />
               
               {delta > 0 && (
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="text-green-400 text-lg font-semibold mt-2"
+                  className="text-green-400 text-lg font-semibold mt-4 text-center"
                 >
                   +{delta} new since last check! 🎉
                 </motion.div>
               )}
-            </div>
 
-            {/* Progress Bar */}
-            <div className="mb-6">
-              <div className="flex justify-between text-sm mb-2">
-                <span>Progress to {goal.toLocaleString()} subscribers</span>
-                <span>{progressPercentage.toFixed(1)}%</span>
+              {/* Next Milestone */}
+              {nextMilestone && (
+                <div className="mb-6 p-4 bg-gray-900 rounded-xl border border-gray-700">
+                  <div className="flex justify-between text-sm mb-2 text-gray-300">
+                    <span>Next Milestone: {nextMilestone} subs</span>
+                    <span>{progressToNextMilestone.toFixed(1)}%</span>
+                  </div>
+                  <div className="w-full bg-gray-800 rounded-full h-3 overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${progressToNextMilestone}%` }}
+                      transition={{ duration: 1.5, ease: "easeOut", delay: 0.5 }}
+                      className="h-full bg-gradient-to-r from-green-400 to-emerald-500 rounded-full"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Milestones Grid */}
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold mb-3 text-white">Milestones</h3>
+                <div className="grid grid-cols-5 gap-2">
+                  {milestones.map((milestone) => {
+                    const isReached = (stats?.subs || 0) >= milestone
+                    const isCurrent = (stats?.subs || 0) < milestone && milestone === nextMilestone
+                    
+                    return (
+                      <motion.div
+                        key={milestone}
+                        initial={{ scale: 0, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={{ delay: milestone / 1000 }}
+                        className={`
+                          text-center p-2 rounded-lg border text-xs font-semibold
+                          ${isReached 
+                            ? 'bg-green-600 border-green-400 text-white' 
+                            : isCurrent 
+                            ? 'bg-yellow-600 border-yellow-400 text-white animate-pulse' 
+                            : 'bg-gray-800 border-gray-600 text-gray-400'
+                          }
+                        `}
+                      >
+                        {milestone}
+                        {isReached && <div className="text-xs">✓</div>}
+                        {isCurrent && <div className="text-xs">🎯</div>}
+                      </motion.div>
+                    )
+                  })}
+                </div>
               </div>
-              <div className="w-full bg-gray-700 rounded-full h-6 overflow-hidden">
+
+              {/* Demo Button */}
+              <motion.button
+                onClick={simulateNewSub}
+                whileHover={{ scale: 1.02, boxShadow: "0 0 30px rgba(34, 197, 94, 0.4)" }}
+                whileTap={{ scale: 0.98 }}
+                className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-bold py-3 px-6 rounded-xl transition-all duration-300 border border-green-500 relative overflow-hidden"
+              >
+                <span className="relative z-10">🎉 Simulate New Subscriber (Demo)</span>
                 <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${progressPercentage}%` }}
-                  transition={{ duration: 1, ease: "easeOut" }}
-                  className="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full animate-gradient"
+                  animate={{ x: [-100, 300] }}
+                  transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent opacity-20"
+                  style={{ width: '100px' }}
                 />
+              </motion.button>
+            </motion.div>
+
+            {/* Chart */}
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.4 }}
+              className="glass-dark rounded-3xl p-8 border-2 border-gray-800"
+            >
+              <h2 className="text-2xl font-bold mb-6 flex items-center text-white">
+                <TrendingUpIcon className="mr-3 w-8 h-8 text-green-400" />
+                Growth Chart
+              </h2>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={chartData}>
+                    <XAxis dataKey="time" stroke="#9CA3AF" />
+                    <YAxis stroke="#9CA3AF" />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'rgba(0,0,0,0.9)',
+                        border: '1px solid #374151',
+                        borderRadius: '8px',
+                        color: 'white'
+                      }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="subscribers"
+                      stroke="#8B5CF6"
+                      strokeWidth={3}
+                      dot={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
               </div>
-              <p className="text-center text-sm text-gray-300 mt-2">
-                Only {subscribersToGo.toLocaleString()} subscribers to go! 🎯
-              </p>
-            </div>
-
-          </motion.div>
-
-          {/* Chart */}
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="glass rounded-3xl p-8"
-          >
-            <h2 className="text-2xl font-bold mb-6 flex items-center">
-              <TrendingUpIcon className="mr-3 w-8 h-8 text-green-400" />
-              Growth Chart
-            </h2>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData}>
-                  <XAxis dataKey="time" stroke="#9CA3AF" />
-                  <YAxis stroke="#9CA3AF" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'rgba(0,0,0,0.8)',
-                      border: 'none',
-                      borderRadius: '8px',
-                      color: 'white'
-                    }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="subscribers"
-                    stroke="#8B5CF6"
-                    strokeWidth={3}
-                    dot={false}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </motion.div>
-        </div>
-
-        {/* Additional Stats */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12"
-        >
-          <div className="glass rounded-3xl p-6 text-center">
-            <EyeIcon className="w-12 h-12 text-blue-400 mx-auto mb-4" />
-            <div className="text-3xl font-bold">{stats?.views.toLocaleString()}</div>
-            <div className="text-gray-300">Total Views</div>
+            </motion.div>
           </div>
-          <div className="glass rounded-3xl p-6 text-center">
-            <VideoIcon className="w-12 h-12 text-red-400 mx-auto mb-4" />
-            <div className="text-3xl font-bold">{stats?.videos.toLocaleString()}</div>
-            <div className="text-gray-300">Videos</div>
-          </div>
-        </motion.div>
 
-        {/* Latest Shorts */}
-        {shorts.length > 0 && (
+          {/* Additional Stats */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="glass rounded-3xl p-8"
+            transition={{ delay: 0.6 }}
+            className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12"
           >
-            <h2 className="text-2xl font-bold mb-6 flex items-center">
-              <PlayIcon className="mr-3 w-8 h-8 text-red-400" />
-              Latest Shorts
-            </h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              {shorts.map((short) => (
-                <motion.a
-                  key={short.id}
-                  href={`https://www.youtube.com/watch?v=${short.id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  whileHover={{ scale: 1.05, y: -5 }}
-                  className="glass rounded-2xl overflow-hidden"
-                >
-                  <img
-                    src={short.thumbnail}
-                    alt={short.title}
-                    className="w-full aspect-[9/16] object-cover"
-                  />
-                  <div className="p-3">
-                    <h3 className="text-sm font-semibold line-clamp-2 mb-2">
-                      {short.title}
-                    </h3>
-                    <p className="text-xs text-gray-400">
-                      {short.views.toLocaleString()} views
-                    </p>
-                  </div>
-                </motion.a>
-              ))}
-            </div>
+            <motion.div 
+              whileHover={{ scale: 1.02, y: -5 }}
+              className="glass-dark rounded-3xl p-6 text-center border-2 border-gray-800"
+            >
+              <EyeIcon className="w-12 h-12 text-blue-400 mx-auto mb-4" />
+              <div className="text-3xl font-bold text-white">{stats?.views.toLocaleString()}</div>
+              <div className="text-gray-300">Total Views</div>
+            </motion.div>
+            <motion.div 
+              whileHover={{ scale: 1.02, y: -5 }}
+              className="glass-dark rounded-3xl p-6 text-center border-2 border-gray-800"
+            >
+              <VideoIcon className="w-12 h-12 text-red-400 mx-auto mb-4" />
+              <div className="text-3xl font-bold text-white">{stats?.videos.toLocaleString()}</div>
+              <div className="text-gray-300">Videos</div>
+            </motion.div>
           </motion.div>
-        )}
 
-        {/* Footer */}
-        <div className="text-center mt-12 text-gray-400">
-          <p>Updates every 10 seconds • Made with ❤️ for our amazing community</p>
+          {/* Latest Shorts */}
+          {shorts.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.8 }}
+              className="glass-dark rounded-3xl p-8 border-2 border-gray-800"
+            >
+              <h2 className="text-2xl font-bold mb-6 flex items-center text-white">
+                <PlayIcon className="mr-3 w-8 h-8 text-red-400" />
+                Latest Shorts
+              </h2>
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                {shorts.map((short, index) => (
+                  <motion.a
+                    key={short.id}
+                    href={`https://www.youtube.com/watch?v=${short.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.1 * index }}
+                    whileHover={{ scale: 1.05, y: -5 }}
+                    className="glass-dark rounded-2xl overflow-hidden border border-gray-700"
+                  >
+                    <img
+                      src={short.thumbnail}
+                      alt={short.title}
+                      className="w-full aspect-[9/16] object-cover"
+                    />
+                    <div className="p-3">
+                      <h3 className="text-sm font-semibold line-clamp-2 mb-2 text-white">
+                        {short.title}
+                      </h3>
+                      <p className="text-xs text-gray-400">
+                        {short.views.toLocaleString()} views
+                      </p>
+                    </div>
+                  </motion.a>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          {/* Footer */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1 }}
+            className="text-center mt-12 text-gray-400"
+          >
+            <p>Updates every 10 seconds • Made with ❤️ for our amazing community</p>
+            <p className="text-sm mt-2">🎮 Press 'B' for confetti • 🚀 Celebrating every milestone</p>
+          </motion.div>
         </div>
       </div>
-    </div>
+    </>
   )
 }

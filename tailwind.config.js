@@ -7,14 +7,6 @@ module.exports = {
   ],
   theme: {
     extend: {
-      utilities: {
-        '.animation-delay-2000': {
-          'animation-delay': '2s',
-        },
-        '.animation-delay-4000': {
-          'animation-delay': '4s',
-        },
-      },
       colors: {
         brand: {
           50: '#f0f4ff',
@@ -44,7 +36,6 @@ module.exports = {
         'gradient': 'gradient 8s ease infinite',
         'float': 'float 6s ease-in-out infinite',
         'glow': 'glow 2s ease-in-out infinite',
-        'blob': 'blob 7s infinite',
       },
       keyframes: {
         gradient: {
@@ -55,20 +46,6 @@ module.exports = {
           '50%': {
             'background-size': '200% 200%',
             'background-position': 'right center'
-          }
-        },
-        blob: {
-          '0%': {
-            transform: 'translate(0px, 0px) scale(1)'
-          },
-          '33%': {
-            transform: 'translate(30px, -50px) scale(1.1)'
-          },
-          '66%': {
-            transform: 'translate(-20px, 20px) scale(0.9)'
-          },
-          '100%': {
-            transform: 'translate(0px, 0px) scale(1)'
           }
         },
         float: {
