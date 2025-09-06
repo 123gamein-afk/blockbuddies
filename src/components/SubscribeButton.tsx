@@ -1,7 +1,7 @@
 import { useSpring, animated } from '@react-spring/web'
 import { useInView } from 'react-intersection-observer'
 import classNames from 'classnames'
-import { YouTubeIcon } from './Icons'
+import { YouTubeIcon, PlayIcon, ExternalLinkIcon } from './Icons'
 
 interface SubscribeButtonProps {
   channelId: string
@@ -61,6 +61,6 @@ export const SubscribeButton = ({ channelId, className }: SubscribeButtonProps) 
         <span className="absolute inset-0 animate-glow opacity-0 group-hover:opacity-100 transition-opacity" />
       </span>
       <ExternalLinkIcon className="w-5 h-5 ml-3" />
-    </motion.a>
+    </animated.a>
   )
 }
